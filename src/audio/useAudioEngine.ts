@@ -38,10 +38,12 @@ export function useAudioEngine(): void {
             startBeat: state.playheadBeat,
             metronome: state.metronomeEnabled,
             loop: { enabled: state.loopEnabled, startBeat: state.loopStart, endBeat: state.loopEnd },
+            onLoadingChange: (loading) => useUiStore.getState().setIsLoadingAudio(loading),
           });
           wasPlaying.current = true;
         } else if (wasPlaying.current) {
           audioEngine.stop();
+          useUiStore.getState().setIsLoadingAudio(false);
           wasPlaying.current = false;
         }
       }),

@@ -4,6 +4,7 @@ import { useUiStore } from '@/state/uiStore';
 import { SNAP_OPTIONS, beatsPerBar, timeSignatureAtBeat } from '@/utils/time';
 import { BeatRuler } from '@/components/common/BeatRuler';
 import { Playhead } from '@/components/common/Playhead';
+import { Icon } from '@/components/common/Icon';
 import { usePreviewInstrument } from '@/audio/usePreviewInstrument';
 import { PianoKeys } from './PianoKeys';
 import { PianoRollGrid } from './PianoRollGrid';
@@ -167,13 +168,13 @@ export function InstrumentView() {
             <hr className="sep" />
             <div className="btn-group">
               <button className={`btn ${tool === 'draw' ? 'toggled' : ''}`} title="Draw (click/drag to add notes)" onClick={() => setTool('draw')}>
-                ✏️ Draw
+                <Icon name="pencil" /> Draw
               </button>
               <button className={`btn ${tool === 'select' ? 'toggled' : ''}`} title="Select" onClick={() => setTool('select')}>
-                ⬚ Select
+                <Icon name="cursor" /> Select
               </button>
               <button className={`btn ${tool === 'erase' ? 'toggled' : ''}`} title="Erase" onClick={() => setTool('erase')}>
-                🗑 Erase
+                <Icon name="eraser" /> Erase
               </button>
             </div>
             <hr className="sep" />

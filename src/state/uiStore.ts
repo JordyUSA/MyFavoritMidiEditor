@@ -25,6 +25,8 @@ interface UiState {
 
   isPlaying: boolean;
   setIsPlaying: (p: boolean) => void;
+  isLoadingAudio: boolean;
+  setIsLoadingAudio: (loading: boolean) => void;
   playheadBeat: number;
   setPlayheadBeat: (b: number) => void;
   loopEnabled: boolean;
@@ -70,6 +72,8 @@ export const useUiStore = create<UiState>((set) => ({
 
   isPlaying: false,
   setIsPlaying: (p) => set({ isPlaying: p }),
+  isLoadingAudio: false,
+  setIsLoadingAudio: (loading) => set({ isLoadingAudio: loading }),
   playheadBeat: 0,
   setPlayheadBeat: (b) => set({ playheadBeat: b }),
   loopEnabled: false,

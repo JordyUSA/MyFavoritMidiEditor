@@ -2,7 +2,7 @@ import * as Tone from 'tone';
 import type { Project, Track, TempoMarker, TimeSignatureMarker } from '@/state/types';
 import { flattenProject, projectEndBeat } from '@/utils/flatten';
 import { beatsToSeconds, secondsToBeats, timeSignatureAtBeat } from '@/utils/time';
-import { createInstrument, disposeInstrument, instrumentOutputNode, triggerNote, type PlayableInstrument } from './instruments';
+import { createPlayableInstrument, disposeInstrument, instrumentOutputNode, triggerNote, type PlayableInstrument, type LoadProgress } from './instruments';
 import { createToneEffect, updateToneEffect } from './effects';
 import { audioBufferToWav } from './wavEncoder';
 
@@ -14,6 +14,26 @@ interface LiveTrack {
   part: Tone.Part;
 }
 
+const SAMPLE_LOAD_TIMEOUT_MS = 18000;
+
+/**
+ * Waits for `promise` up to `ms`, but never rejects: a flaky network mid-fetch
+ * (or a CDN that's briefly unreachable) should silently fall back rather than
+ * take down playback. Individual failed samples are already handled inside
+ * `smplr` (that track's sound is just missing); this guards against the
+ * fetch itself throwing (e.g. a connection reset), which smplr does not
+ * catch, from becoming an unhandled rejection.
+ */
+function withTimeout(promise: Promise<unknown>, ms: number): Promise<void> {
+  return Promise.race([
+    promise.then(
+      () => undefined,
+      () => undefined,
+    ),
+    new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  ]);
+}
+
 /**
  * Owns the whole live playback graph: one instrument + effect chain + mixer
  * channel per un-muted track, feeding a shared master bus. Also supports
@@ -23,6 +43,11 @@ interface LiveTrack {
  * tempo map via beatsToSeconds), so Tone.Transport's own bpm setting is left
  * at its default and never consulted — this lets a single project contain
  * tempo changes without fighting Tone's transport-tempo automation.
+ *
+ * Instruments with `source: 'soundfont'` play real sampled audio (fetched
+ * from a public CDN the first time each sound is used); `play()` waits for
+ * that initial fetch (up to SAMPLE_LOAD_TIMEOUT_MS) before starting the
+ * transport, reporting progress via `opts.onLoadProgress`.
  */
 export class AudioEngine {
   private masterVolume: Tone.Volume;
@@ -32,6 +57,7 @@ export class AudioEngine {
   private metronomeAccent: Tone.MetalSynth | null = null;
   private metronomePart: Tone.Part | null = null;
   private tempoMap: TempoMarker[] = [{ beat: 0, bpm: 120 }];
+  private playToken = 0;
 
   constructor() {
     this.limiter = new Tone.Limiter(-1).toDestination();
@@ -54,8 +80,14 @@ export class AudioEngine {
     this.metronomeAccent = null;
   }
 
-  private buildChain(track: Track, destination: Tone.ToneAudioNode): { instrument: PlayableInstrument; effectNodes: Tone.ToneAudioNode[]; channel: Tone.Channel } {
-    const instrument = createInstrument(track.instrument);
+  private buildChain(
+    track: Track,
+    ctx: BaseAudioContext,
+    destination: Tone.ToneAudioNode,
+    onLoadProgress?: (p: LoadProgress) => void,
+  ): { instrument: PlayableInstrument; effectNodes: Tone.ToneAudioNode[]; channel: Tone.Channel } {
+    const pitchesNeeded = Array.from(new Set(track.notes.map((n) => n.pitch)));
+    const instrument = createPlayableInstrument(track.instrument, ctx, onLoadProgress, pitchesNeeded);
     const channel = new Tone.Channel({ volume: track.volume, pan: track.pan, mute: false }).connect(destination);
     const effectNodes = track.effects.map((fx) => createToneEffect(fx));
 
@@ -102,8 +134,14 @@ export class AudioEngine {
   /** (Re)builds the whole graph from the current project and starts playback from `startBeat`. */
   async play(
     project: Project,
-    opts: { startBeat: number; metronome: boolean; loop: { enabled: boolean; startBeat: number; endBeat: number } },
+    opts: {
+      startBeat: number;
+      metronome: boolean;
+      loop: { enabled: boolean; startBeat: number; endBeat: number };
+      onLoadingChange?: (loading: boolean) => void;
+    },
   ): Promise<void> {
+    const token = ++this.playToken;
     await Tone.start();
     const transport = Tone.getTransport();
     transport.stop();
@@ -112,10 +150,13 @@ export class AudioEngine {
 
     this.tempoMap = project.tempoMap;
     this.masterVolume.volume.value = project.masterVolume;
+    const ctx = Tone.getContext().rawContext as unknown as BaseAudioContext;
 
     const flat = flattenProject(project).filter((ft) => !ft.effectivelyMuted);
+    const readyPromises: Promise<void>[] = [];
     for (const ft of flat) {
-      const { instrument, effectNodes, channel } = this.buildChain(ft.track, this.masterVolume);
+      const { instrument, effectNodes, channel } = this.buildChain(ft.track, ctx, this.masterVolume);
+      if (instrument.kind === 'sampled') readyPromises.push(instrument.ready.catch(() => undefined));
       const events = ft.notes.map((n) => ({
         time: beatsToSeconds(n.absoluteStart, project.tempoMap),
         pitch: n.pitch,
@@ -131,6 +172,13 @@ export class AudioEngine {
       part.start(0);
       this.liveTracks.push({ trackId: ft.track.id, instrument, effectNodes, channel, part });
     }
+
+    if (readyPromises.length > 0) {
+      opts.onLoadingChange?.(true);
+      await withTimeout(Promise.all(readyPromises), SAMPLE_LOAD_TIMEOUT_MS);
+      opts.onLoadingChange?.(false);
+    }
+    if (token !== this.playToken) return; // superseded by a newer play()/stop() while we were loading
 
     const endBeat = Math.max(projectEndBeat(project), opts.loop.endBeat);
     if (opts.metronome) {
@@ -170,6 +218,7 @@ export class AudioEngine {
   }
 
   stop(): void {
+    this.playToken++;
     const transport = Tone.getTransport();
     transport.stop();
     transport.seconds = 0;
@@ -208,17 +257,20 @@ export class AudioEngine {
   }
 
   /** Renders the project to a WAV Blob, faster than real time, using an offline audio context. */
-  async renderToWav(project: Project): Promise<Blob> {
+  async renderToWav(project: Project, onLoadProgress?: (p: LoadProgress) => void): Promise<Blob> {
     const endBeat = projectEndBeat(project) + 4;
     const durationSeconds = beatsToSeconds(endBeat, project.tempoMap) + 2;
 
-    const buffer = await Tone.Offline(({ transport }) => {
+    const buffer = await Tone.Offline(async ({ transport, rawContext }) => {
       const limiter = new Tone.Limiter(-1).toDestination();
       const master = new Tone.Volume(project.masterVolume).connect(limiter);
       const flat = flattenProject(project).filter((ft) => !ft.effectivelyMuted);
 
+      const readyPromises: Promise<void>[] = [];
       for (const ft of flat) {
-        const instrument = createInstrument(ft.track.instrument);
+        const pitchesNeeded = Array.from(new Set(ft.notes.map((n) => n.pitch)));
+        const instrument = createPlayableInstrument(ft.track.instrument, rawContext as unknown as BaseAudioContext, onLoadProgress, pitchesNeeded);
+        if (instrument.kind === 'sampled') readyPromises.push(instrument.ready.catch(() => undefined));
         const channel = new Tone.Channel({ volume: ft.track.volume, pan: ft.track.pan }).connect(master);
         const effectNodes = ft.track.effects.map((fx) => createToneEffect(fx));
         let node: Tone.ToneAudioNode = instrumentOutputNode(instrument);
@@ -236,6 +288,7 @@ export class AudioEngine {
           }, start);
         }
       }
+      await withTimeout(Promise.all(readyPromises), SAMPLE_LOAD_TIMEOUT_MS);
       transport.start();
     }, durationSeconds);
 

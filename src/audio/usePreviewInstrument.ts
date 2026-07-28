@@ -1,15 +1,19 @@
 import { useEffect, useRef } from 'react';
 import * as Tone from 'tone';
 import type { InstrumentSpec } from '@/state/types';
-import { createInstrument, disposeInstrument, instrumentOutputNode, triggerNote, type PlayableInstrument } from './instruments';
+import { createPlayableInstrument, disposeInstrument, instrumentOutputNode, triggerNote, type PlayableInstrument } from './instruments';
 
 /** A small throwaway instrument (routed straight to the speakers) for click-to-preview interactions. */
 export function usePreviewInstrument(spec: InstrumentSpec) {
   const ref = useRef<PlayableInstrument | null>(null);
-  const specKey = `${spec.isDrumKit}-${spec.program}`;
+  const specKey = `${spec.source}-${spec.isDrumKit}-${spec.program}-${spec.drumKitName ?? ''}`;
 
   useEffect(() => {
-    const instrument = createInstrument(spec);
+    const ctx = Tone.getContext().rawContext as unknown as BaseAudioContext;
+    const instrument = createPlayableInstrument(spec, ctx);
+    // A sample fetch can fail (offline, blocked CDN, etc.) — swallow it here so it
+    // never surfaces as an unhandled rejection; preview clicks just stay silent.
+    if (instrument.kind === 'sampled') instrument.ready.catch(() => undefined);
     instrumentOutputNode(instrument).toDestination();
     ref.current = instrument;
     return () => {

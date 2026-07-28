@@ -3,6 +3,7 @@ import { useProjectStore } from '@/state/projectStore';
 import { useUiStore } from '@/state/uiStore';
 import { gmFamilyForProgram } from '@/utils/gmInstruments';
 import { NoteDensityStrip } from './NoteDensityStrip';
+import { Icon } from '@/components/common/Icon';
 import './TrackRow.css';
 
 interface TrackRowProps {
@@ -25,7 +26,7 @@ export function TrackRow({ waveformId, track }: TrackRowProps) {
         title={track.muted ? 'Unmute' : 'Mute'}
         onClick={() => updateTrack(waveformId, track.id, { muted: !track.muted })}
       >
-        {track.muted ? '🔇' : '🔊'}
+        <Icon name={track.muted ? 'mute' : 'volume'} />
       </button>
       <button
         className={`btn icon-only ${track.solo ? 'toggled' : ''}`}
@@ -53,13 +54,14 @@ export function TrackRow({ waveformId, track }: TrackRowProps) {
         title={`Volume ${track.volume}dB`}
       />
       <button className="btn icon-only" title="Effects" onClick={() => openEffectsFor(waveformId, track.id)}>
-        FX{track.effects.length > 0 ? ` (${track.effects.length})` : ''}
+        <Icon name="sliders" />
+        {track.effects.length > 0 ? track.effects.length : ''}
       </button>
       <button className="btn primary" onClick={() => openInstrumentView(waveformId, track.id)}>
         Open
       </button>
       <button className="btn danger icon-only" title="Delete track" onClick={() => removeTrack(waveformId, track.id)}>
-        ✕
+        <Icon name="trash" />
       </button>
     </div>
   );

@@ -6,6 +6,7 @@ import { buildMeasures, groupIntoEvents, assignVoices, renderLane, type Chunk } 
 import { midiToVexKey } from '@/musicxml/vexPitch';
 import { midiToNoteName } from '@/utils/gmInstruments';
 import { usePreviewInstrument } from '@/audio/usePreviewInstrument';
+import { Icon } from '@/components/common/Icon';
 import './NotationView.css';
 
 interface NotationViewProps {
@@ -185,7 +186,7 @@ export function NotationView({ waveformId, track, timeSignatureMap, barBeats }: 
         />
         <span>{track.instrument.isDrumKit ? '' : midiToNoteName(armedPitch)}</span>
         <button className="btn" onClick={() => preview(armedPitch)}>
-          ▶ Hear
+          <Icon name="play" /> Hear
         </button>
         <span className="notation-hint">
           Click a measure to place the armed note · Shift+click to remove it · switch to Bars view to drag/resize freely
