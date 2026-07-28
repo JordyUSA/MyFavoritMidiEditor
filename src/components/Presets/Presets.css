@@ -1,0 +1,55 @@
+.presets-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.presets-controls input[type='number'] {
+  width: 56px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-0);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+
+.presets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.preset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--bg-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+}
+
+.preset-row-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.preset-genre {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: 6px;
+}
+
+.preset-row-desc {
+  font-size: 11.5px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
