@@ -1,0 +1,21 @@
+.beat-ruler {
+  position: relative;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  cursor: text;
+  flex-shrink: 0;
+}
+
+.beat-ruler-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--grid-bar);
+  padding-left: 4px;
+  font-size: 10px;
+  color: var(--text-2);
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 3px;
+  pointer-events: none;
+}

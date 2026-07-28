@@ -1,0 +1,39 @@
+.piano-keys {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  flex-shrink: 0;
+  background: var(--bg-1);
+  border-right: 1px solid var(--border);
+}
+
+.piano-key {
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6px;
+  font-size: 9px;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+}
+.piano-key.white {
+  background: #e9ebef;
+  color: #2a2e35;
+}
+.piano-key.black {
+  background: #23262d;
+  color: #9aa1ad;
+}
+.piano-key.white:hover,
+.piano-key.black:hover {
+  filter: brightness(1.15);
+}
+.piano-key .drum-label {
+  font-size: 8.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

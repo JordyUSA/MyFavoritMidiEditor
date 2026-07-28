@@ -1,0 +1,18 @@
+.velocity-lane {
+  position: relative;
+  background: var(--bg-1);
+  border-top: 1px solid var(--border);
+}
+
+.velocity-bar {
+  position: absolute;
+  bottom: 0;
+  width: 5px;
+  border-radius: 2px 2px 0 0;
+  cursor: ns-resize;
+  opacity: 0.85;
+}
+.velocity-bar.selected {
+  outline: 1px solid var(--text-0);
+  opacity: 1;
+}

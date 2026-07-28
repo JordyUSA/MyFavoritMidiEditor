@@ -1,0 +1,36 @@
+.piano-roll-grid {
+  cursor: crosshair;
+  user-select: none;
+}
+
+.note-block {
+  position: absolute;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+  cursor: grab;
+}
+.note-block:active {
+  cursor: grabbing;
+}
+.note-block.selected {
+  outline: 1.5px solid var(--text-0);
+  z-index: 5;
+}
+.note-block.draft {
+  pointer-events: none;
+}
+
+.note-block-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+}
+.note-block-handle.left {
+  left: 0;
+}
+.note-block-handle.right {
+  right: 0;
+}
