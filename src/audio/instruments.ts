@@ -1,11 +1,26 @@
 import * as Tone from 'tone';
-import { gmFamilyForProgram } from '@/utils/gmInstruments';
-import { midiToNoteName } from '@/utils/gmInstruments';
+import { Soundfont, SplendidGrandPiano, Sampler, type Smplr } from 'smplr';
+import { gmFamilyForProgram, midiToNoteName, GM_DRUM_NOTES } from '@/utils/gmInstruments';
+import { gmSoundfontSlug } from './gmSoundfontNames';
+import { DEFAULT_DRUM_MACHINE, drumSampleUrlsFor, drumLabel, type DrumMachineName } from './drumMachineMap';
+import { makeThrottledLoader } from './bufferLoader';
 import { DrumKit } from './drumKit';
 import type { InstrumentSpec } from '@/state/types';
 
-export type MelodicInstrument = Tone.PolySynth;
-export type PlayableInstrument = MelodicInstrument | DrumKit;
+export type LoadProgress = { loaded: number; total: number };
+
+export type PlayableInstrument =
+  | { kind: 'synth'; node: Tone.PolySynth }
+  | { kind: 'synthDrums'; node: DrumKit }
+  | {
+      kind: 'sampled';
+      smplr: Smplr;
+      /** Tone-connectable entry point: smplr writes into `bridge.input` (a real native GainNode). */
+      bridge: Tone.Gain;
+      ready: Promise<void>;
+      /** Maps a GM pitch to whatever `smplr.start({ note })` expects (a MIDI number for melodic instruments, a sample-group name for drum machines). */
+      noteFor: (pitch: number) => string | number;
+    };
 
 interface FamilyPreset {
   voice: 'synth' | 'mono' | 'fm' | 'am';
@@ -43,31 +58,68 @@ function presetForProgram(program: number): FamilyPreset {
   return FAMILY_PRESETS[family] ?? DEFAULT_PRESET;
 }
 
-export function createInstrument(spec: InstrumentSpec): PlayableInstrument {
-  if (spec.isDrumKit) return new DrumKit();
+function createSynthInstrument(spec: InstrumentSpec): PlayableInstrument {
+  if (spec.isDrumKit) return { kind: 'synthDrums', node: new DrumKit() };
 
   const preset = presetForProgram(spec.program);
   switch (preset.voice) {
     case 'mono':
-      return new Tone.PolySynth(Tone.MonoSynth, {
-        oscillator: preset.oscillator,
-        envelope: preset.envelope,
-      } as any);
+      return { kind: 'synth', node: new Tone.PolySynth(Tone.MonoSynth, { oscillator: preset.oscillator, envelope: preset.envelope } as any) };
     case 'fm':
-      return new Tone.PolySynth(Tone.FMSynth, {
-        envelope: preset.envelope,
-      } as any);
+      return { kind: 'synth', node: new Tone.PolySynth(Tone.FMSynth, { envelope: preset.envelope } as any) };
     case 'am':
-      return new Tone.PolySynth(Tone.AMSynth, {
-        envelope: preset.envelope,
-      } as any);
+      return { kind: 'synth', node: new Tone.PolySynth(Tone.AMSynth, { envelope: preset.envelope } as any) };
     case 'synth':
     default:
-      return new Tone.PolySynth(Tone.Synth, {
-        oscillator: preset.oscillator,
-        envelope: preset.envelope,
-      } as any);
+      return { kind: 'synth', node: new Tone.PolySynth(Tone.Synth, { oscillator: preset.oscillator, envelope: preset.envelope } as any) };
   }
+}
+
+/**
+ * Builds a playable instrument for `spec` against `ctx` (a live AudioContext
+ * for real playback, or an OfflineContext's rawContext for rendering).
+ * 'soundfont' instruments fetch real sampled audio from a public CDN
+ * (https://smpldsnds.github.io / midi-js-soundfonts) the first time each
+ * note/kit is used — `ready` resolves once the initial batch has loaded.
+ * Falls back to the offline synth engine if `spec.source` is `'synth'`.
+ */
+/** All standard GM percussion pitches — used to size a drum sampler when the caller doesn't know which pitches it'll need up front (e.g. click-to-preview). */
+const ALL_GM_DRUM_PITCHES = GM_DRUM_NOTES.map((d) => d.pitch);
+
+export function createPlayableInstrument(
+  spec: InstrumentSpec,
+  ctx: BaseAudioContext,
+  onLoadProgress?: (p: LoadProgress) => void,
+  /** Pitches this instrument actually needs to play — lets a drum kit fetch only the handful of real samples it uses instead of the whole 100+ sample kit. Defaults to every GM drum pitch. */
+  pitchesNeeded?: number[],
+): PlayableInstrument {
+  if (spec.source === 'synth') return createSynthInstrument(spec);
+
+  const bridge = new Tone.Gain();
+
+  if (spec.isDrumKit) {
+    const kit = (spec.drumKitName as DrumMachineName) ?? DEFAULT_DRUM_MACHINE;
+    const pitches = pitchesNeeded && pitchesNeeded.length > 0 ? pitchesNeeded : ALL_GM_DRUM_PITCHES;
+    const smplr = Sampler(ctx, {
+      buffers: makeThrottledLoader(drumSampleUrlsFor(kit, pitches)),
+      destination: bridge.input,
+      onLoadProgress,
+    });
+    return {
+      kind: 'sampled',
+      smplr,
+      bridge,
+      ready: smplr.ready,
+      noteFor: (pitch) => drumLabel(pitch),
+    };
+  }
+
+  const isPiano = spec.program === 0;
+  const smplr = isPiano
+    ? SplendidGrandPiano(ctx, { destination: bridge.input, onLoadProgress })
+    : Soundfont(ctx, { instrument: gmSoundfontSlug(spec.program), kit: 'MusyngKite', destination: bridge.input, onLoadProgress });
+
+  return { kind: 'sampled', smplr, bridge, ready: smplr.ready, noteFor: (pitch) => pitch };
 }
 
 export function triggerNote(
@@ -77,19 +129,45 @@ export function triggerNote(
   time: number,
   velocity: number,
 ): void {
-  const v = Math.max(0.02, Math.min(1, velocity / 127));
-  if (instrument instanceof DrumKit) {
-    instrument.triggerAttackRelease(pitch, durationSeconds, time, v);
-  } else {
-    instrument.triggerAttackRelease(midiToNoteName(pitch), Math.max(0.03, durationSeconds), time, v);
+  const clampedVelocity = Math.max(1, Math.min(127, velocity));
+  switch (instrument.kind) {
+    case 'synth':
+      instrument.node.triggerAttackRelease(midiToNoteName(pitch), Math.max(0.03, durationSeconds), time, clampedVelocity / 127);
+      break;
+    case 'synthDrums':
+      instrument.node.triggerAttackRelease(pitch, durationSeconds, time, clampedVelocity / 127);
+      break;
+    case 'sampled':
+      instrument.smplr.start({
+        note: instrument.noteFor(pitch),
+        velocity: clampedVelocity,
+        time,
+        duration: Math.max(0.02, durationSeconds),
+      });
+      break;
+  }
+}
+
+export function instrumentOutputNode(instrument: PlayableInstrument): Tone.ToneAudioNode {
+  switch (instrument.kind) {
+    case 'synth':
+      return instrument.node;
+    case 'synthDrums':
+      return instrument.node.output;
+    case 'sampled':
+      return instrument.bridge;
   }
 }
 
 export function disposeInstrument(instrument: PlayableInstrument): void {
-  instrument.dispose();
-}
-
-/** DrumKit isn't itself a Tone audio node (it fans out to several synths internally) — connect its `.output` instead. */
-export function instrumentOutputNode(instrument: PlayableInstrument): Tone.ToneAudioNode {
-  return instrument instanceof DrumKit ? instrument.output : (instrument as unknown as Tone.ToneAudioNode);
+  switch (instrument.kind) {
+    case 'synth':
+    case 'synthDrums':
+      instrument.node.dispose();
+      break;
+    case 'sampled':
+      instrument.smplr.dispose();
+      instrument.bridge.dispose();
+      break;
+  }
 }

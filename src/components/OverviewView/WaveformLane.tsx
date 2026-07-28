@@ -5,6 +5,7 @@ import { useUiStore } from '@/state/uiStore';
 import { snapBeat } from '@/utils/time';
 import { NoteDensityStrip } from './NoteDensityStrip';
 import { TrackRow } from './TrackRow';
+import { Icon } from '@/components/common/Icon';
 import './WaveformLane.css';
 
 interface WaveformLaneProps {
@@ -58,7 +59,7 @@ export function WaveformLane({ waveform, pxPerBeat }: WaveformLaneProps) {
       <div className="waveform-lane-row">
         <div className="waveform-sidebar" style={{ borderLeftColor: waveform.color }}>
           <button className="btn icon-only" onClick={() => toggleCollapsed(waveform.id)} title="Expand/collapse">
-            {waveform.collapsed ? '▸' : '▾'}
+            <Icon name={waveform.collapsed ? 'chevronRight' : 'chevronDown'} />
           </button>
           {editingName ? (
             <input
@@ -89,13 +90,13 @@ export function WaveformLane({ waveform, pxPerBeat }: WaveformLaneProps) {
           )}
           <div className="waveform-sidebar-actions">
             <button className="btn icon-only" title={waveform.muted ? 'Unmute' : 'Mute'} onClick={() => setWaveformMuted(waveform.id, !waveform.muted)}>
-              {waveform.muted ? '🔇' : '🔊'}
+              <Icon name={waveform.muted ? 'mute' : 'volume'} />
             </button>
             <button className="btn icon-only" title="Duplicate" onClick={() => duplicateWaveform(waveform.id)}>
-              ⧉
+              <Icon name="duplicate" />
             </button>
             <button className="btn danger icon-only" title="Delete waveform" onClick={() => removeWaveform(waveform.id)}>
-              ✕
+              <Icon name="trash" />
             </button>
           </div>
         </div>

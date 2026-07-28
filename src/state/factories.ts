@@ -23,8 +23,9 @@ export function createInstrument(program = 0, isDrumKit = false): InstrumentSpec
   return {
     program,
     isDrumKit,
-    source: 'synth',
-    name: isDrumKit ? 'Standard Drum Kit' : gmInstrumentName(program),
+    source: 'soundfont',
+    drumKitName: isDrumKit ? 'TR-808' : undefined,
+    name: isDrumKit ? 'TR-808 Drum Machine' : gmInstrumentName(program),
   };
 }
 

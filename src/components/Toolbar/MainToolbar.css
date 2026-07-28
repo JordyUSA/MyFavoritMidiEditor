@@ -11,9 +11,17 @@
 }
 
 .app-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: 14px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   white-space: nowrap;
+  color: var(--text-0);
+}
+.app-title svg {
+  color: var(--accent);
 }
 
 .project-name-input {

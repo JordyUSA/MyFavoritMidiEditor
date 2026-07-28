@@ -82,7 +82,10 @@ export interface InstrumentSpec {
   program: number;
   /** True if this track is the GM percussion kit (MIDI channel 10). */
   isDrumKit: boolean;
+  /** 'soundfont' = real sampled instruments (default); 'synth' = fast, fully offline oscillators. */
   source: InstrumentSource;
+  /** Which real drum machine sample kit to use when isDrumKit && source==='soundfont'. */
+  drumKitName?: string;
   /** Human label, e.g. "Acoustic Grand Piano". */
   name: string;
 }

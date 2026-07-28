@@ -1,4 +1,5 @@
 import { Modal } from './Modal';
+import { Icon } from './Icon';
 import { useUiStore } from '@/state/uiStore';
 import { useProjectStore } from '@/state/projectStore';
 import type { EffectType } from '@/state/types';
@@ -67,7 +68,7 @@ export function EffectsPanel() {
                 <strong>{EFFECT_LABELS[fx.type]}</strong>
               </label>
               <button className="btn danger icon-only" onClick={() => removeEffect(target.waveformId, target.trackId, fx.id)}>
-                ✕
+                <Icon name="trash" />
               </button>
             </div>
             <div className="effect-params">

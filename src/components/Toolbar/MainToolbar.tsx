@@ -6,6 +6,7 @@ import { downloadMidi, triggerDownload } from '@/midi/export';
 import { exportProjectToMusicXml } from '@/musicxml/export';
 import { downloadProject, parseProjectFile, readFileAsText, MfmeParseError } from '@/fileformat/mfme';
 import { audioEngine } from '@/audio/engine';
+import { Icon } from '@/components/common/Icon';
 import './MainToolbar.css';
 
 export function MainToolbar() {
@@ -71,7 +72,9 @@ export function MainToolbar() {
 
   return (
     <div className="main-toolbar">
-      <span className="app-title">🎹 MyFavoritMidiEditor</span>
+      <span className="app-title">
+        <Icon name="piano" size={18} /> MyFavoritMidiEditor
+      </span>
       <input
         className="project-name-input"
         value={project.name}
@@ -90,11 +93,11 @@ export function MainToolbar() {
       <button className="btn" onClick={() => confirm('Start a new project? Unsaved changes will be lost unless exported/saved.') && newProject()}>
         New
       </button>
-      <button className="btn" disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z not bound globally — use button)">
-        ↶ Undo
+      <button className="btn icon-only" disabled={!canUndo} onClick={undo} title="Undo">
+        <Icon name="undo" />
       </button>
-      <button className="btn" disabled={!canRedo} onClick={redo}>
-        ↷ Redo
+      <button className="btn icon-only" disabled={!canRedo} onClick={redo} title="Redo">
+        <Icon name="redo" />
       </button>
       <hr className="sep" />
       <button className="btn" onClick={() => midiInputRef.current?.click()}>
@@ -120,10 +123,10 @@ export function MainToolbar() {
       <input ref={loadInputRef} type="file" accept=".mfme,application/json" hidden onChange={(e) => onLoadProject(e.target.files)} />
       <hr className="sep" />
       <button className="btn" onClick={() => setActivePanel('presetsBeats')}>
-        🥁 Beat Presets
+        <Icon name="drum" /> Beat Presets
       </button>
       <button className="btn" onClick={() => setActivePanel('presetsSongs')}>
-        🎼 Song Presets
+        <Icon name="musicNote" /> Song Presets
       </button>
       {error && (
         <div className="toolbar-error" onClick={() => setError(null)} title="Click to dismiss">

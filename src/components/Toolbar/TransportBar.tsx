@@ -1,6 +1,7 @@
 import { useUiStore } from '@/state/uiStore';
 import { useProjectStore } from '@/state/projectStore';
 import { bpmAtBeat, beatsToSeconds, timeSignatureAtBeat, beatsPerBar } from '@/utils/time';
+import { Icon } from '@/components/common/Icon';
 import './TransportBar.css';
 
 function formatTime(seconds: number): string {
@@ -17,6 +18,7 @@ export function TransportBar() {
 
   const isPlaying = useUiStore((s) => s.isPlaying);
   const setIsPlaying = useUiStore((s) => s.setIsPlaying);
+  const isLoadingAudio = useUiStore((s) => s.isLoadingAudio);
   const playheadBeat = useUiStore((s) => s.playheadBeat);
   const setPlayheadBeat = useUiStore((s) => s.setPlayheadBeat);
   const loopEnabled = useUiStore((s) => s.loopEnabled);
@@ -36,21 +38,23 @@ export function TransportBar() {
   return (
     <div className="transport-bar">
       <button className="btn icon-only" title="Stop" onClick={() => { setIsPlaying(false); setPlayheadBeat(0); }}>
-        ⏹
+        <Icon name="stop" />
       </button>
-      <button className={`btn primary icon-only`} title={isPlaying ? 'Pause' : 'Play'} onClick={() => setIsPlaying(!isPlaying)}>
-        {isPlaying ? '⏸' : '▶'}
+      <button className="btn primary icon-only" title={isPlaying ? 'Pause' : 'Play'} onClick={() => setIsPlaying(!isPlaying)}>
+        {isLoadingAudio ? <span className="spinner" /> : <Icon name={isPlaying ? 'pause' : 'play'} />}
       </button>
       <div className="transport-time">
-        <span className="transport-bars">
+        <span className="transport-bars mono">
           {bar}:{beatInBar}
         </span>
-        <span className="transport-seconds">{formatTime(seconds)}</span>
+        <span className="transport-seconds mono">{formatTime(seconds)}</span>
       </div>
+      {isLoadingAudio && <span className="transport-loading">Loading instrument sounds…</span>}
       <hr className="sep" />
       <label className="transport-field">
         <span className="field-label">BPM</span>
         <input
+          className="mono"
           type="number"
           min={20}
           max={300}
@@ -62,18 +66,18 @@ export function TransportBar() {
           }}
         />
       </label>
-      <span className="field-label">
+      <span className="field-label mono">
         {sig.numerator}/{sig.denominator}
       </span>
       <hr className="sep" />
       <button className={`btn ${loopEnabled ? 'toggled' : ''}`} title="Loop" onClick={() => setLoop(!loopEnabled)}>
-        🔁 Loop
+        <Icon name="loop" /> Loop
       </button>
       {loopEnabled && (
         <>
           <input
             type="number"
-            className="transport-loop-input"
+            className="transport-loop-input mono"
             value={loopStart}
             min={0}
             onChange={(e) => setLoop(true, Number(e.target.value), undefined)}
@@ -82,7 +86,7 @@ export function TransportBar() {
           <span>–</span>
           <input
             type="number"
-            className="transport-loop-input"
+            className="transport-loop-input mono"
             value={loopEnd}
             min={0}
             onChange={(e) => setLoop(true, undefined, Number(e.target.value))}
@@ -91,7 +95,7 @@ export function TransportBar() {
         </>
       )}
       <button className={`btn ${metronomeEnabled ? 'toggled' : ''}`} title="Metronome" onClick={() => setMetronome(!metronomeEnabled)}>
-        🥁 Click
+        <Icon name="metronome" /> Click
       </button>
       <hr className="sep" />
       <span className="field-label">Master</span>
